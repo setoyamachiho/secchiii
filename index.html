@@ -100,3 +100,275 @@
       border: 2px solid #e0e0e0;
       border-radius: 8px;
       cursor: crosshair;
+      touch-action: none;
+      background-color: #fafafa;
+    }
+    textarea {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0; 
+      border-radius: 8px; 
+      box-sizing: border-box;
+      font-size: 16px;
+      resize: vertical;
+      min-height: 120px;
+    }
+    
+    /* ボタンスタイル */
+    .btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      font-size: 16px;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(102,126,234,0.4);
+      transition: all 0.3s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 10px;
+      margin-bottom: 10px;
+    }
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(102,126,234,0.6);
+    }
+    .btn:disabled {
+      background: #ccc;
+      box-shadow: none;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .btn-danger {
+      background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%);
+      box-shadow: 0 4px 15px rgba(255,65,108,0.4);
+    }
+    .btn-danger:hover {
+      box-shadow: 0 6px 20px rgba(255,65,108,0.6);
+    }
+    
+    /* ステータス表示 */
+    .status-panel {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 8px;
+      background-color: #f8f9fa;
+      border-left: 4px solid #667eea;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>スーパー記録くん</h1>
+  
+  <div class="mode-tabs">
+    <button class="mode-tab active" onclick="switchMode('camera')">📷 カメラ撮影</button>
+    <button class="mode-tab" onclick="switchMode('audio')">🎤 音声録音</button>
+    <button class="mode-tab" onclick="switchMode('canvas')">🎨 手書きメモ</button>
+  </div>
+  
+  <div id="cameraMode" class="mode-content active">
+    <div class="media-container">
+      <video id="videoPreview" autoplay playsinline muted></video>
+    </div>
+    <button id="startCamBtn" class="btn" onclick="startCamera()">カメラ起動</button>
+    <button id="captureBtn" class="btn btn-danger" onclick="capturePhoto()" disabled>パシャリ！</button>
+  </div>
+  
+  <div id="audioMode" class="mode-content">
+    <div id="audioVisualizer"></div>
+    <button id="startAudioBtn" class="btn" onclick="startAudioRecord()">録音開始</button>
+    <button id="stopAudioBtn" class="btn btn-danger" onclick="stopAudioRecord()" disabled>録音停止</button>
+  </div>
+  
+  <div id="canvasMode" class="mode-content">
+    <canvas id="drawingCanvas" width="650" height="350"></canvas>
+    <div style="margin-top: 10px;">
+      <button class="btn" onclick="clearCanvas()">クリア</button>
+    </div>
+  </div>
+  
+  <div style="margin-top: 25px;">
+    <h3>📝 テキストメモ</h3>
+    <textarea id="textMemo" placeholder="気づいたことや、メモを自由に入力してください..."></textarea>
+  </div>
+  
+  <div style="margin-top: 25px; text-align: center;">
+    <button id="uploadBtn" class="btn" style="width: 100%; font-size: 18px; padding: 15px;" onclick="uploadData()">
+      🚀 ドライブ＆スプレッドシートへ保存
+    </button>
+  </div>
+  
+  <div id="status" class="status-panel" style="display: none;"></div>
+</div>
+
+<script>
+  let currentMode = 'camera';
+  let stream = null;
+  let mediaRecorder = null;
+  let audioChunks = [];
+  let isDrawing = false;
+  let lastX = 0;
+  let lastY = 0;
+  let capturedBlob = null;
+  let audioBlob = null;
+  
+  // モード切替
+  function switchMode(mode) {
+    currentMode = mode;
+    document.querySelectorAll('.mode-tab').forEach((tab, index) => {
+      tab.classList.toggle('active', (index === 0 && mode === 'camera') || (index === 1 && mode === 'audio') || (index === 2 && mode === 'canvas'));
+    });
+    document.querySelectorAll('.mode-content').forEach(content => {
+      content.classList.remove('active');
+    });
+    document.getElementById(mode + 'Mode').classList.add('active');
+    
+    if (mode !== 'camera' && stream) {
+      stream.getTracks().forEach(track => track.stop());
+      stream = null;
+      document.getElementById('captureBtn').disabled = true;
+    }
+    if (mode === 'canvas') {
+      initCanvas();
+    }
+  }
+  
+  // カメラ処理
+  async function startCamera() {
+    try {
+      showStatus("カメラを起動中...", "#667eea");
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+      document.getElementById('videoPreview').srcObject = stream;
+      document.getElementById('captureBtn').disabled = false;
+      hideStatus();
+    } catch (err) {
+      showStatus("カメラの起動に失敗しました。権限を確認してください。", "#ff416c");
+    }
+  }
+  
+  function capturePhoto() {
+    const video = document.getElementById('videoPreview');
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+    
+    canvas.toBlob((blob) => {
+      capturedBlob = blob;
+      showStatus("写真をパシャリ！保存の準備ができました。", "#2ecc71");
+    }, 'image/jpeg');
+  }
+  
+  // 音声処理
+  async function startAudioRecord() {
+    audioChunks = [];
+    try {
+      const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(audioStream);
+      mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+      mediaRecorder.onstop = () => {
+        audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+        showStatus("録音が完了しました。保存の準備ができました。", "#2ecc71");
+      };
+      mediaRecorder.start();
+      document.getElementById('startAudioBtn').disabled = true;
+      document.getElementById('stopAudioBtn').disabled = false;
+      showStatus("録音中...", "#ff416c");
+    } catch (err) {
+      showStatus("マイクの起動に失敗しました。", "#ff416c");
+    }
+  }
+  
+  function stopAudioRecord() {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+      mediaRecorder.stream.getTracks().forEach(track => track.stop());
+      document.getElementById('startAudioBtn').disabled = false;
+      document.getElementById('stopAudioBtn').disabled = true;
+    }
+  }
+  
+  // キャンバス処理
+  function initCanvas() {
+    const canvas = document.getElementById('drawingCanvas');
+    const ctx = canvas.getContext('2d');
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    
+    function draw(e) {
+      if (!isDrawing) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX || e.touches[0].clientX) - rect.left;
+      const y = (e.clientY || e.touches[0].clientY) - rect.top;
+      
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      [lastX, lastY] = [x, y];
+    }
+    
+    canvas.addEventListener('mousedown', (e) => {
+      isDrawing = true;
+      const rect = canvas.getBoundingClientRect();
+      [lastX, lastY] = [e.clientX - rect.left, e.clientY - rect.top];
+    });
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', () => isDrawing = false);
+    
+    canvas.addEventListener('touchstart', (e) => {
+      isDrawing = true;
+      const rect = canvas.getBoundingClientRect();
+      [lastX, lastY] = [e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top];
+    });
+    canvas.addEventListener('touchmove', draw);
+    canvas.addEventListener('touchend', () => isDrawing = false);
+  }
+  
+  function clearCanvas() {
+    const canvas = document.getElementById('drawingCanvas');
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+  
+  // ステータス表示
+  function showStatus(text, color) {
+    const el = document.getElementById('status');
+    el.style.display = 'block';
+    el.style.backgroundColor = color;
+    el.style.color = '#fff';
+    el.innerText = text;
+  }
+  
+  function hideStatus() {
+    document.getElementById('status').style.display = 'none';
+  }
+  
+  // データのアップロード処理
+  async function uploadData() {
+    const memo = document.getElementById('textMemo').value;
+    const uploadBtn = document.getElementById('uploadBtn');
+    
+    uploadBtn.disabled = true;
+    showStatus("データを送信中...そのままお待ちください。", "#764ba2");
+    
+    let base64Data = "";
+    let fileType = "none";
+    
+    if (currentMode === 'camera' && capturedBlob) {
+      base64Data = await blobToBase64(capturedBlob);
+      fileType = "image/jpeg";
+    } else if (currentMode === 'audio' && audioBlob) {
+      base64Data = await blobToBase64(audioBlob);
+      fileType = "audio/mp3";
+    } else if (currentMode === 'canvas') {
+      const canvas = document.getElementById('drawingCanvas');
+      base64Data = canvas.toDataURL('image/png').split(',')[1];
