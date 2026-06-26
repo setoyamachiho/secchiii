@@ -1,11 +1,168 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <base target="_top">
-  <title>スーパー記録くん - メディア記録アプリ</title>
-  <style>
-    body { 
-      font-family: 'Segoe UI', Tahoma, sans-serif; 
-      margin: 0; 
-      padding: 20px; 
-      background: linear-gradient(135deg, #667eea 0%, #764ba2
+    <base target="_top">
+    <title>スーパー記録くん - メディア記録アプリ</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #4A154B, #6B114D);
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: white;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 30px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            text-align: center;
+            margin-top: 50px;
+        }
+        h1 { margin-bottom: 30px; font-size: 24px; }
+        .btn {
+            background: #007aff;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 25px;
+            cursor: pointer;
+            width: 80%;
+            margin: 15px 0;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,122,255,0.4);
+        }
+        .btn:active { transform: scale(0.98); }
+        .btn.recording {
+            background: #ff3b30;
+            animation: pulse 1.5s infinite;
+            box-shadow: 0 4px 15px rgba(255,59,48,0.4);
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
+        #status {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #e0e0e0;
+            min-height: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>スーパー記録くん 🎙️</h1>
+        
+        <button id="recordBtn" class="btn">音声録音 開始</button>
+        
+        <div id="status">ボタンを押すと録音が始まります</div>
+    </div>
+
+    <script>
+        // Google Apps ScriptのWebアプリURLをここに貼り付けてください
+        const gasWebUrl = 'YOUR_GAS_WEB_APP_URL'; 
+
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+
+        const recordBtn = document.getElementById('recordBtn');
+        const statusDiv = document.getElementById('status');
+
+        recordBtn.addEventListener('click', async () => {
+            if (!isRecording) {
+                // 録音開始の処理
+                audioChunks = [];
+                statusDiv.innerText = "マイクを準備中...";
+                
+                try {
+                    // パソコンのブラウザで確実にマイクを掴むための標準的な記述
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    
+                    mediaRecorder = new MediaRecorder(stream);
+                    
+                    mediaRecorder.ondataavailable = (event) => {
+                        if (event.data.size > 0) {
+                            audioChunks.push(event.data);
+                        }
+                    };
+
+                    mediaRecorder.onstop = async () => {
+                        statusDiv.innerText = "音声を送信データに変換中...";
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+                        
+                        // ベース64に変換してGASに送る準備
+                        const reader = new FileReader();
+                        reader.readAsDataURL(audioBlob);
+                        reader.onloadend = () => {
+                            const base64Data = reader.result.split(',')[1];
+                            sendToGas(base64Data);
+                        };
+                    };
+
+                    mediaRecorder.start();
+                    isRecording = true;
+                    recordBtn.innerText = "録音停止 (データを保存)";
+                    recordBtn.classList.add('recording');
+                    statusDiv.innerText = "録音中... お話してください。";
+
+                } catch (err) {
+                    console.error(err);
+                    statusDiv.innerText = "エラー: マイクが起動できませんでした（許可を確認してください）";
+                }
+            } else {
+                // 録音停止の処理
+                if (mediaRecorder && mediaRecorder.state !== "inactive") {
+                    mediaRecorder.stop();
+                    // マイクのランプを消すためにストリームを止める
+                    mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                }
+                isRecording = false;
+                recordBtn.innerText = "音声録音 開始";
+                recordBtn.classList.remove('recording');
+            }
+        });
+
+        // GASへデータを送信する関数
+        function sendToGas(base64Data) {
+            statusDiv.innerText = "Googleドライブに音声を送信中...";
+            
+            if(gasWebUrl === 'YOUR_GAS_WEB_APP_URL') {
+                statusDiv.innerText = "エラー: GASのURLが設定されていません";
+                return;
+            }
+
+            fetch(gasWebUrl, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    type: 'audio',
+                    filename: 'voice_' + new Date().getTime() + '.mp3',
+                    data: base64Data
+                })
+            })
+            .then(() => {
+                statusDiv.innerText = "✅ 送信完了！保存されました。";
+            })
+            .catch(err => {
+                console.error(err);
+                statusDiv.innerText = "❌ 送信に失敗しました。";
+            });
+        }
+    </script>
+</body>
+</html>
