@@ -70,8 +70,8 @@
     </div>
 
     <script>
-        // ChihoさんのGAS WebアプリURLを直接埋め込みました
-        const gasWebUrl = 'https://script.google.com/macros/s/AKfycby9XWwiR8LnC3e2-bCbjoSMVflYV2eNAWLGc7WOE2OIfeyzhqOrp-dgB5yizFVystl5dQ/exec'; 
+        // 新しいGAS WebアプリURLを直接埋め込みました
+        const gasWebUrl = 'https://script.google.com/macros/s/AKfycbzJucgs9j42hq0UMdT5P87iN7Vr-rbupzfr-acXtgNPW24aw2L14UJz9OHco7SL5GQp/exec'; 
 
         let mediaRecorder;
         let audioChunks = [];
@@ -86,7 +86,6 @@
                 statusDiv.innerText = "マイクを準備中...";
                 
                 try {
-                    // パソコンのブラウザで確実にマイクを認識させる設定
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                     
                     mediaRecorder = new MediaRecorder(stream);
