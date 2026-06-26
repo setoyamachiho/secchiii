@@ -70,8 +70,8 @@
     </div>
 
     <script>
-        // Google Apps ScriptのWebアプリURLをここに貼り付けてください
-        const gasWebUrl = 'YOUR_GAS_WEB_APP_URL'; 
+        // ChihoさんのGAS WebアプリURLを直接埋め込みました
+        const gasWebUrl = 'https://script.google.com/macros/s/AKfycby9XWwiR8LnC3e2-bCbjoSMVflYV2eNAWLGc7WOE2OIfeyzhqOrp-dgB5yizFVystl5dQ/exec'; 
 
         let mediaRecorder;
         let audioChunks = [];
@@ -82,12 +82,11 @@
 
         recordBtn.addEventListener('click', async () => {
             if (!isRecording) {
-                // 録音開始の処理
                 audioChunks = [];
                 statusDiv.innerText = "マイクを準備中...";
                 
                 try {
-                    // パソコンのブラウザで確実にマイクを掴むための標準的な記述
+                    // パソコンのブラウザで確実にマイクを認識させる設定
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                     
                     mediaRecorder = new MediaRecorder(stream);
@@ -102,7 +101,6 @@
                         statusDiv.innerText = "音声を送信データに変換中...";
                         const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
                         
-                        // ベース64に変換してGASに送る準備
                         const reader = new FileReader();
                         reader.readAsDataURL(audioBlob);
                         reader.onloadend = () => {
@@ -119,13 +117,11 @@
 
                 } catch (err) {
                     console.error(err);
-                    statusDiv.innerText = "エラー: マイクが起動できませんでした（許可を確認してください）";
+                    statusDiv.innerText = "エラー: マイクが起動できませんでした（ブラウザの許可を確認してください）";
                 }
             } else {
-                // 録音停止の処理
                 if (mediaRecorder && mediaRecorder.state !== "inactive") {
                     mediaRecorder.stop();
-                    // マイクのランプを消すためにストリームを止める
                     mediaRecorder.stream.getTracks().forEach(track => track.stop());
                 }
                 isRecording = false;
@@ -134,14 +130,8 @@
             }
         });
 
-        // GASへデータを送信する関数
         function sendToGas(base64Data) {
             statusDiv.innerText = "Googleドライブに音声を送信中...";
-            
-            if(gasWebUrl === 'YOUR_GAS_WEB_APP_URL') {
-                statusDiv.innerText = "エラー: GASのURLが設定されていません";
-                return;
-            }
 
             fetch(gasWebUrl, {
                 method: 'POST',
@@ -156,7 +146,7 @@
                 })
             })
             .then(() => {
-                statusDiv.innerText = "✅ 送信完了！保存されました。";
+                statusDiv.innerText = "✅ 送信完了！Googleドライブに保存されました。";
             })
             .catch(err => {
                 console.error(err);
